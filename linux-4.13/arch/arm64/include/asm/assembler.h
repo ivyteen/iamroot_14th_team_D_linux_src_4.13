@@ -268,8 +268,12 @@ lr	.req	x30		// link register
  * read_ctr - read CTR_EL0. If the system has mismatched
  * cache line sizes, provide the system wide safe value
  * from arm64_ftr_reg_ctrel0.sys_val
+ *		*Iamroot14차D팀*
+ *		*Cache Type Register, EL0
+ *		*시스템의 캐시 라인 크기가 일치하지 않으면 
+ *		*arm64_ftr_reg_ctrel0.sys_val에서 시스템 전체 안전 값을 제공
  */
-	.macro	read_ctr, reg
+	.macro	read_ctr, reg   
 alternative_if_not ARM64_MISMATCHED_CACHE_LINE_SIZE
 	mrs	\reg, ctr_el0			// read CTR
 	nop
@@ -292,6 +296,8 @@ alternative_endif
 
 /*
  * dcache_line_size - get the safe D-cache line size across all CPUs
+ *		*Iamroot14차D팀* 
+ *      *캐시 라인 워드 사이즈를 읽어온 후 4를 곱하여 reg 레지스터로 리턴
  */
 	.macro	dcache_line_size, reg, tmp
 	read_ctr	\tmp

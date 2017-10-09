@@ -1,5 +1,5 @@
-			Booting AArch64 Linux
-			=====================
+      Booting AArch64 Linux
+      =====================
 
 Author: Will Deacon <will.deacon@arm.com>
 Date  : 07 September 2012
@@ -72,16 +72,16 @@ Requirement: MANDATORY
 
 The decompressed kernel image contains a 64-byte header as follows:
 
-  u32 code0;			/* Executable code */
-  u32 code1;			/* Executable code */
-  u64 text_offset;		/* Image load offset, little endian */
-  u64 image_size;		/* Effective Image size, little endian */
-  u64 flags;			/* kernel flags, little endian */
-  u64 res2	= 0;		/* reserved */
-  u64 res3	= 0;		/* reserved */
-  u64 res4	= 0;		/* reserved */
-  u32 magic	= 0x644d5241;	/* Magic number, little endian, "ARM\x64" */
-  u32 res5;			/* reserved (used for PE COFF offset) */
+  u32 code0;      /* Executable code */
+  u32 code1;      /* Executable code */
+  u64 text_offset;    /* Image load offset, little endian */
+  u64 image_size;   /* Effective Image size, little endian */
+  u64 flags;      /* kernel flags, little endian */
+  u64 res2  = 0;    /* reserved */
+  u64 res3  = 0;    /* reserved */
+  u64 res4  = 0;    /* reserved */
+  u32 magic = 0x644d5241; /* Magic number, little endian, "ARM\x64" */
+  u32 res5;     /* reserved (used for PE COFF offset) */
 
 
 Header notes:
@@ -103,19 +103,19 @@ Header notes:
 
 - The flags field (introduced in v3.17) is a little-endian 64-bit field
   composed as follows:
-  Bit 0:	Kernel endianness.  1 if BE, 0 if LE.
-  Bit 1-2:	Kernel Page size.
-			0 - Unspecified.
-			1 - 4K
-			2 - 16K
-			3 - 64K
-  Bit 3:	Kernel physical placement
-			0 - 2MB aligned base should be as close as possible
-			    to the base of DRAM, since memory below it is not
-			    accessible via the linear mapping
-			1 - 2MB aligned base may be anywhere in physical
-			    memory
-  Bits 4-63:	Reserved.
+  Bit 0:  Kernel endianness.  1 if BE, 0 if LE.
+  Bit 1-2:  Kernel Page size.
+      0 - Unspecified.
+      1 - 4K
+      2 - 16K
+      3 - 64K
+  Bit 3:  Kernel physical placement
+      0 - 2MB aligned base should be as close as possible
+          to the base of DRAM, since memory below it is not
+          accessible via the linear mapping
+      1 - 2MB aligned base may be anywhere in physical
+          memory
+  Bits 4-63:  Reserved.
 
 - When image_size is zero, a bootloader should attempt to keep as much
   memory as possible free for use by the kernel immediately after the
@@ -161,9 +161,17 @@ Before jumping into the kernel, the following conditions must be met:
 
 - Caches, MMUs
   The MMU must be off.
-  Instruction cache may be on or off.
+  Instruction cache may be on or off. 
+    *Iamroot14차D팀*
+    *I-cache는 변경이 않되므로, coherency를 만족 시켜도 되지 않으므로 on or off다.
+    *하지만, D-cache의 경우 coherency문제를 발생 시킬 수 있으므로 MMU와 같이 off.
   The address range corresponding to the loaded kernel image must be
-  cleaned to the PoC. In the presence of a system cache or other
+  cleaned to the PoC. 
+    *Iamroot14차D팀*
+    *Point of Coherency(PoC): 특정한 MVA를 위해 PoC는 접근하는 모든 agent(cores, bus(dma, mmio))들이
+    *메모리 위치의 동일한 사본 값을 access할 수 있게 보장하는 포인트이다.
+    *address 변환과정 VA->MVA(=VA + (0x2000000 * process ID))->PA
+  In the presence of a system cache or other
   coherent masters with caches enabled, this will typically require
   cache maintenance by VA rather than set/way operations.
   System caches which respect the architected cache maintenance by VA

@@ -80,9 +80,9 @@
 
 #ifndef ENTRY
 #define ENTRY(name) \
-	.globl name ASM_NL \
-	ALIGN ASM_NL \
-	name:
+	.globl name ASM_NL \ *Iamroot14차D팀* .global stext; .global=심볼을 외부 참조가 가능하게 한다. 
+	ALIGN ASM_NL \ 		 *Iamroot14차D팀* ALIGN;
+	name: 				 *Iamroot14차D팀* stext lable생성
 #endif
 #endif /* LINKER_SCRIPT */
 

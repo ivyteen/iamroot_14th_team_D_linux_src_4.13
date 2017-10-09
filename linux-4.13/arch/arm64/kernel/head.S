@@ -59,8 +59,19 @@
  * ---------------------------
  *
  * The requirements are:
- *   MMU = off, D-cache = off, I-cache = on or off,
- *   x0 = physical address to the FDT blob.
+ * MMU = off, D-cache = off, I-cache = on or off, 
+ *   
+ * 	 *Iamroot14차D팀*
+ *	 *부팅시 memroy에 적재된 instruction set 실행을 할 수 있으므로 I-cache는 on or off
+ *   *Doc/arm64/booting.txt내 'Caches, MMUs' 부분에 설명 추가.                        
+ *   *cache coherency문제 떄문에 cache를 끈다.                                        
+ *   
+ * x0 = physical address to the FDT blob. 
+ *   *Iamroot14차D팀*
+ *   *U-boot에서 FDT PA를 x0로 넘겨준다.                                     
+ *   *blob:binary large object                                               
+ *   *FDT(Flattened Device Tree)=하드웨어의 구조를 기술하기 위한 데이터 구조.
+ *   
  *
  * This code is mostly position independent so you call this at
  * __pa(PAGE_OFFSET + TEXT_OFFSET).
@@ -68,13 +79,14 @@
  * Note that the callee-saved registers are used for storing variables
  * that are useful before the MMU is enabled. The allocations are described
  * in the entry routines.
- */
-	__HEAD
+ */ 
+	__HEAD *Iamroot14차D팀*.head.text section 영역
+
 _head:
 	/*
 	 * DO NOT MODIFY. Image header expected by Linux boot-loaders.
 	 */
-#ifdef CONFIG_EFI
+#ifdef CONFIG_EFI //EFI=executable firmware interface
 	/*
 	 * This add instruction has no meaningful effect except that
 	 * its opcode forms the magic "MZ" signature required by UEFI.
@@ -132,19 +144,30 @@ ENDPROC(stext)
 
 /*
  * Preserve the arguments passed by the bootloader in x0 .. x3
+ * 		x0 = physical address to the FDT blob.
  */
 preserve_boot_args:
 	mov	x21, x0				// x21=FDT
-
-	adr_l	x0, boot_args			// record the contents of
-	stp	x21, x1, [x0]			// x0 .. x3 at kernel entry
-	stp	x2, x3, [x0, #16]
-
-	dmb	sy				// needed before dc ivac with
-						// MMU off
-
+								*Iamroot14차D팀*x0=FDT의 PA를 x21로 복사
+	adr_l	x0, boot_args	// record the contents of 
+								*Iamroot14차D팀*boot_args는 kernel/setup.c에서 선언
+	stp	x21, x1, [x0]		// x0 .. x3 at kernel entry
+	stp	x2, x3, [x0, #16]	
+								*Iamroot14차D팀*
+								*x0~3중 x0에만 FDT PA가 들어가 있고, x1~3은 0으로 유지
+								*후에 setup_arch()에서 x1~3 reg에 값이 존재하는지 확인 후 pr_err처리
+	dmb	sy					// needed before dc ivac with
+							// MMU off
+								*Iamroot14차D팀*
+								*Data Memory Barrier(DMB)
+						   	    *메모리 장벽 역할을 한다. 프로그램 순서에서 dmb 명령어 앞에 있는 
+						   	    *모든 메모리 액세스 명령들은 dmb 명령어 뒤에 있는 
+						   	    *메모리 액세스보다 먼저 처리되도록 한다. 
 	add	x1, x0, #0x20			// 4 x 8 bytes
-	b	__inval_cache_range		// tail call
+								*Iamroot14차D팀* 
+								*x1 address = boot_args + offset 32(0x20)의 값을 가짐
+								*x21,x1,x2,x3의 값을 boot_args에 할당 했으므로 32의 offset을 가짐
+	b	__inval_cache_range	// tail call
 ENDPROC(preserve_boot_args)
 
 /*

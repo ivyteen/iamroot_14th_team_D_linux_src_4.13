@@ -123,7 +123,7 @@ __dma_inv_area:
  *	- end     - end address of region
  */
 ENTRY(__inval_cache_range)
-	dcache_line_size x2, x3
+	dcache_line_size x2, x3 *Iamroot14차D팀* arm64/include/asm/assembler.h에 위치
 	sub	x3, x2, #1
 	tst	x1, x3				// end cache line aligned?
 	bic	x1, x1, x3
