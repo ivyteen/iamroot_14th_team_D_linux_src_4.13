@@ -274,11 +274,15 @@ lr	.req	x30		// link register
  *		*arm64_ftr_reg_ctrel0.sys_val에서 시스템 전체 안전 값을 제공
  */
 	.macro	read_ctr, reg   
-alternative_if_not ARM64_MISMATCHED_CACHE_LINE_SIZE
-	mrs	\reg, ctr_el0			// read CTR
+alternative_if_not ARM64_MISMATCHED_CACHE_LINE_SIZE		// iamroot - alternative_if_not이 뭔지 확실히 모르고 넘어감
+														// arch/arm64/include/asm/alternative.h에 macro로 정의됨
+														// 현재까진 #ifdef와 같은 조건부 컴파일 코드로 이해함
+														// 이 부분은 if not mismatched 이므로, cache line size가 match 인 경우에 해당
+	mrs	\reg, ctr_el0			// read CTR				// <- 여기서 EL0에 대한 cache type register의 내용을 general purpose reg에 저장
 	nop
 alternative_else
-	ldr_l	\reg, arm64_ftr_reg_ctrel0 + ARM64_FTR_SYSVAL
+	ldr_l	\reg, arm64_ftr_reg_ctrel0 + ARM64_FTR_SYSVAL	// iamroot - mismatched인 경우, 구조체 변수 arm64_ftr_reg_ctrel0의 sys_val 멤버의 주소를 reg에 저장
+															// arm64_ftr_reg_ctrel0는 arch/arm64/include/asm/cpufeature.h 참조
 alternative_endif
 	.endm
 
@@ -296,14 +300,22 @@ alternative_endif
 
 /*
  * dcache_line_size - get the safe D-cache line size across all CPUs
- *		*Iamroot14차D팀* 
- *      *캐시 라인 워드 사이즈를 읽어온 후 4를 곱하여 reg 레지스터로 리턴
  */
 	.macro	dcache_line_size, reg, tmp
-	read_ctr	\tmp
+	read_ctr	\tmp					// iamroot - cache type register의 내용을 읽기 위한 매크로
+
 	ubfm		\tmp, \tmp, #16, #19	// cache line size encoding
-	mov		\reg, #4		// bytes per word
+										// iamroot - read_ctr로 읽어들인 cache type register(CTR)에서 일부 bits에 대한 data 추출
+										// #16 : right rotate amount
+										// #19 : leftmost bit number to be moved from the source
+										// CTR의 16~19bit가 DminLine이므로, 19bit부터 오른쪽으로 16bit를 shift - LSR 명령
+										// DminLine : Log2 of the number of words in the smallest cache line of all the data and unified caches that the processor controls
+										// 즉 DminLine이 0~3bit로 이동하고, 4~19bit는 0으로 채워짐
+						
+	mov		\reg, #4					// bytes per word
+										// iamroot - arm64에서도 word의 단위는 4byte(32bit)인듯, 반면 register의 크기는 64bit
 	lsl		\reg, \reg, \tmp	// actual cache line size
+										// iamroot - 4(bytes per word)를 DminLine 값만큼 left shift => (bytes per word)*(2^DminLine)
 	.endm
 
 /*
