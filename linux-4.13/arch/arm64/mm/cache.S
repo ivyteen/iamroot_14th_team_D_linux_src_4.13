@@ -127,6 +127,10 @@ ENTRY(__inval_cache_range)
 								// x2에 cache line size 저장
 	sub	x3, x2, #1
 	tst	x1, x3				// end cache line aligned?
+							// iamroot
+							// x3 = cache line size - 1
+							// x1에는 주소 저장
+							// tst 명령으로 비트별 and 연산하여 cache line align 여부 판단
 	bic	x1, x1, x3
 	b.eq	1f
 	dc	civac, x1			// clean & invalidate D / U line

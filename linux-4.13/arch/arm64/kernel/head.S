@@ -128,6 +128,8 @@ pe_header:
 ENTRY(stext)
 	bl	preserve_boot_args
 	bl	el2_setup			// Drop to EL1, w0=cpu_boot_mode
+							// iamroot - EL2 : Hypervisor 
+							// iamroot - w0 : x0의 32bit 값
 	adrp	x23, __PHYS_OFFSET
 	and	x23, x23, MIN_KIMG_ALIGN - 1	// KASLR offset, defaults to 0
 	bl	set_cpu_boot_mode_flag
@@ -422,36 +424,75 @@ ENTRY(kimage_vaddr)
  */
 ENTRY(el2_setup)
 	mrs	x0, CurrentEL
-	cmp	x0, #CurrentEL_EL2
+	cmp	x0, #CurrentEL_EL2			// iamroot - 현재 exception level 검사
 	b.eq	1f
-	mrs	x0, sctlr_el1
+	mrs	x0, sctlr_el1				// iamroot - 현재 EL1인 경우 여기부터
+
 CPU_BE(	orr	x0, x0, #(3 << 24)	)	// Set the EE and E0E bits for EL1
 CPU_LE(	bic	x0, x0, #(3 << 24)	)	// Clear the EE and E0E bits for EL1
+									// iamroot - endian 형식에 따라 CPU_BE 또는 CPU_LE 중 하나만 적용됨
+									// 
+									//	EE : exception endianness(0 : little endian, 1:big endian)
+									//		Exception endianness. Indicates the endianness of the translation table data for the translation table lookups. 
+									// 		The EE bit is permitted to be cached in a TLB.
+									//	EOE : exception level 0(user level)의 endianness - 0 : little endian, 1:big endian
+									//		Endianness of explicit data access at EL0.
+
+									// ** Exception level ***
+									// EL0 : applications
+									// EL1 : kernel level(supervisor)
+									// EL2 : hypervisor (run-time에서 OS switching)
+									// EL3 : secure monitor
+
 	msr	sctlr_el1, x0
 	mov	w0, #BOOT_CPU_MODE_EL1		// This cpu booted in EL1
-	isb
-	ret
+	isb								// iamroot - isb : instruction syncronization barrier
+									//				http://jake.dothome.co.kr/barriers2/ 내용 참조
 
-1:	mrs	x0, sctlr_el2
+	ret								// iamroot - 현재 EL1인 경우 여기까지
+									// 분석은 여기까지만...;;;
+
+									// iamroot - 여기는 EL2인 경우
+1:	mrs	x0, sctlr_el2				// iamroot - EL2인 경우는 PASS!!! 해석할 엄두가 안난다
+									// sctlr_el2 : el2의 system control register
+									// -> bit 0 : mmu enable
+									//    bit 2 : cache enable
+
 CPU_BE(	orr	x0, x0, #(1 << 25)	)	// Set the EE bit for EL2
 CPU_LE(	bic	x0, x0, #(1 << 25)	)	// Clear the EE bit for EL2
 	msr	sctlr_el2, x0
 
-#ifdef CONFIG_ARM64_VHE
+#ifdef CONFIG_ARM64_VHE				// iamroot - VHE(Virtualization Host Extension)
+
+				/*  iamroot -
+					The Virtualization Host (VH) Extensions expand the capabilities of EL2:
+					* Designed to improve the support of Type-2 hypervisors
+					* Allows the host OS to be run at EL2
+					* The host OS requires minimal changes to run at EL2
+					* User-space still runs at EL0
+					* Guest OSes run at EL1
+					* Host has no software running at EL1
+					* AArch64 specific
+					*EL2 becomes a strict superset of EL1
+				*/
+
 	/*
 	 * Check for VHE being present. For the rest of the EL2 setup,
 	 * x2 being non-zero indicates that we do have VHE, and that the
 	 * kernel is intended to run at EL2.
 	 */
 	mrs	x2, id_aa64mmfr1_el1
-	ubfx	x2, x2, #8, #4
+	ubfx	x2, x2, #8, #4		/* iamroot - x2의 bit 8부터 4bit 값 추출하여 x2에 저장*/
+								/* id_aa64mmfr1_el1의 VH field 추출 */
+								/* VH : Indicates whether Virtualization Host Extensions are supported.*/
 #else
 	mov	x2, xzr
 #endif
 
 	/* Hyp configuration. */
 	mov	x0, #HCR_RW			// 64-bit EL1
-	cbz	x2, set_hcr
+	cbz	x2, set_hcr				// iamroot - x2(VH)의 값이 0이면 바로 set_hcr로 점프 -> HCR_TGE, HCR_E2H는 set하지 않음.
+								// HCR - Hypervisor Configuration Register
 	orr	x0, x0, #HCR_TGE		// Enable Host Extensions
 	orr	x0, x0, #HCR_E2H
 set_hcr:
