@@ -497,7 +497,14 @@ CPU_LE(	bic	x0, x0, #(1 << 25)	)	// Clear the EE bit for EL2
 	orr	x0, x0, #HCR_E2H
 set_hcr:
 	msr	hcr_el2, x0
-	isb
+	isb						// iamroot
+							// https://books.google.co.kr/books?id=5OZblBzjsJ0C&pg=PA100&lpg=PA100&dq=dmb+dsb+isb&source=bl&ots=m38OkiMhGl&sig=03HH-lDhNsFzwswb4uehtkqbHyw&hl=ko&sa=X&ved=0ahUKEwiAtuC004vXAhVKf7wKHebuCKE4FBDoAQg_MAQ#v=onepage&q=dmb%20dsb%20isb&f=false
+							// DMB(Data Memory Barrier)
+							//	 : Ensures that all memory accesses are completed before new memory access is committed(pipeline상의 memory 단계).
+							// DSB(Data Synchronization Barrier)
+							//	: Ensures that all memory accesses are completed before the next instruction is executed.
+							// ISB(Instruction Synchronization Barrier)
+							//	: Flushes the pipeline and ensures that all previous instructions are completed before executing new instructions.
 
 	/*
 	 * Allow Non-secure EL1 and EL0 to access physical timer and counter.
@@ -509,9 +516,10 @@ set_hcr:
 	 * to transparently mess with the EL0 bits via CNTKCTL_EL1 access in
 	 * EL2.
 	 */
-	cbnz	x2, 1f
+	cbnz	x2, 1f			// iamroot : x2가 0이 아닌 경우(VH인 경우) 1f로 점프
 	mrs	x0, cnthctl_el2
 	orr	x0, x0, #3			// Enable EL1 physical timers
+							// iamroot : 여기는 VH가 아닌 경우 - EL1 physical timer가 필요하다
 	msr	cnthctl_el2, x0
 1:
 	msr	cntvoff_el2, xzr		// Clear virtual offset
