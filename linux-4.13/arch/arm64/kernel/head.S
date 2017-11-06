@@ -524,44 +524,93 @@ set_hcr:
 1:
 	msr	cntvoff_el2, xzr		// Clear virtual offset
 
-#ifdef CONFIG_ARM_GIC_V3
+#ifdef CONFIG_ARM_GIC_V3			// iamroot : GIC(Generic Interrupt Controller)
+									// GIC에 대한 내용은 http://jake.dothome.co.kr/ic/ 참고
+
 	/* GICv3 system register access */
-	mrs	x0, id_aa64pfr0_el1
+	mrs	x0, id_aa64pfr0_el1				// iamroot : 
+										// id_aa64pfr0_el1 : Provides additional information about implemented processor features in AArch64.
+										// bit[24~27]에 GIC CPU Interface enable/disable
+										// 0x0 - disable
+										// 0x1 - enable 
 	ubfx	x0, x0, #24, #4
 	cmp	x0, #1
-	b.ne	3f
+	b.ne	3f							// GIC CPU enable인 경우 아랫줄 실행
 
-	mrs_s	x0, SYS_ICC_SRE_EL2
-	orr	x0, x0, #ICC_SRE_EL2_SRE	// Set ICC_SRE_EL2.SRE==1
+	mrs_s	x0, SYS_ICC_SRE_EL2			// iamroot : SYS_ICC_SRE_EL2는 
+										// arch/arm64/include/asm/sysreg.h에 sys_reg(3, 4, 12, 9, 5)로 정의
+										// sys_reg 매크로에 의해 encoding된 instruction으로 해당 system register의 내용을 읽어옴
+										// ICC_* : GIC physical CPU interface System registers
+										// ICC_SRE_EL2 : Interrupt Controller System Register Enable register (EL2)
+
+	orr	x0, x0, #ICC_SRE_EL2_SRE	// Set ICC_SRE_EL2.SRE==1 
+									// iamroot - SRE(System Register Enable)
+									// 0 : The memory-mapped interface must be used. Access at EL2 to any ICH_* or ICC_*
+									// register other than ICC_SRE_EL1 or ICC_SRE_EL2, is trapped to EL2.
+									// 1 : The System register interface to the ICH_* registers and the EL1 and EL2 ICC_*
+									// registers is enabled for EL2.
+									
 	orr	x0, x0, #ICC_SRE_EL2_ENABLE	// Set ICC_SRE_EL2.Enable==1
+									// iamroot - Enable
+									//  Enables lower Exception level access to ICC_SRE_EL1.
+									// 0 : Non-secure EL1 accesses to ICC_SRE_EL1 trap to EL2.
+									// 1 : Non-secure EL1 accesses to ICC_SRE_EL1 do not trap to EL2.
+	
+	
+
 	msr_s	SYS_ICC_SRE_EL2, x0
 	isb					// Make sure SRE is now set
 	mrs_s	x0, SYS_ICC_SRE_EL2		// Read SRE back,
-	tbz	x0, #0, 3f			// and check that it sticks
+
+	tbz	x0, #0, 3f			// and check that it sticks 
+										// iamroot - x0의 bit[0]이 0이면 3: 으로 jump
+
 	msr_s	SYS_ICH_HCR_EL2, xzr		// Reset ICC_HCR_EL2 to defaults
+
+										// iamroot - ICH_HCR_EL2, Interrupt Controller Hyp Control Register
+										// Controls the environment for VMs
+
 
 3:
 #endif
 
 	/* Populate ID registers. */
-	mrs	x0, midr_el1
-	mrs	x1, mpidr_el1
+	mrs	x0, midr_el1			// iamroot - main ID register EL1
+								// Provides identification information for the processor, 
+								// including an implementer code for the device and a device ID number.
+
+	mrs	x1, mpidr_el1			// iamroot - Multiprocessor Affinity Register, EL1
+								// Provides an additional core identification mechanism for scheduling purposes in a cluster system. 
+								// EDDEVAFF0 is a read-only copy of MPIDR_EL1[31:0] accessible from the external debug interface.
+								// http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0024a/CFHCIDCH.html								
+
 	msr	vpidr_el2, x0
 	msr	vmpidr_el2, x1
 
-#ifdef CONFIG_COMPAT
+#ifdef CONFIG_COMPAT			// iamroot
+								// CONFIG_ COMPAT : "Kernel support for 32-bit EL0"
+
 	msr	hstr_el2, xzr			// Disable CP15 traps to EL2
 #endif
 
 	/* EL2 debug */
 	mrs	x1, id_aa64dfr0_el1		// Check ID_AA64DFR0_EL1 PMUVer
-	sbfx	x0, x1, #8, #4
+								// iamroot - id_aa64dfr0_el1
+								// Provides top-level information about the debug system in AArch64.
+	sbfx	x0, x1, #8, #4		// PMUVer, [11:8]
+								// Performance Monitors Extension version.
+								// 0x4: Performance monitor system registers implemented, PMUv3.
+
 	cmp	x0, #1
 	b.lt	4f				// Skip if no PMU present
 	mrs	x0, pmcr_el0			// Disable debug access traps
 	ubfx	x0, x0, #11, #5			// to EL2 and allow access to
 4:
 	csel	x3, xzr, x0, lt			// all PMU counters from EL1
+									// iamroot - csel의 정확한 의미는???
+									// The conditional select instructions select between the first or second
+									// source register, depending on the current state of the condition flag.
+								 
 
 	/* Statistical profiling */
 	ubfx	x0, x1, #32, #4			// Check ID_AA64DFR0_EL1 PMSVer
