@@ -607,16 +607,27 @@ set_hcr:
 	ubfx	x0, x0, #11, #5			// to EL2 and allow access to
 4:
 	csel	x3, xzr, x0, lt			// all PMU counters from EL1
+
 									// iamroot - csel의 정확한 의미는???
 									// The conditional select instructions select between the first or second
 									// source register, depending on the current state of the condition flag.
+									// if no PMU -> x3 = 0
+									// else -> x3 = pmcr_el0[15:11](Number of event counters)
 								 
 
 	/* Statistical profiling */
 	ubfx	x0, x1, #32, #4			// Check ID_AA64DFR0_EL1 PMSVer
+									// iamroot - PMSVer : hidden :(
+
 	cbz	x0, 6f				// Skip if SPE not present
+							// iamroot - SPE(Statistical Profiling Extension - ARM V8.2 지원)
+
 	cbnz	x2, 5f				// VHE?
 	mov	x1, #(MDCR_EL2_E2PB_MASK << MDCR_EL2_E2PB_SHIFT)
+							// iamroot - MDCR_EL2(Monitor Debugger Configuration Register for EL2)
+							// 뭔지 모르겠다;;; manual상에는 reserved로 나옴
+
+
 	orr	x3, x3, x1			// If we don't have VHE, then
 	b	6f				// use EL1&0 translation.
 5:						// For VHE, use EL2 translation
@@ -625,7 +636,8 @@ set_hcr:
 	msr	mdcr_el2, x3			// Configure debug traps
 
 	/* Stage-2 translation */
-	msr	vttbr_el2, xzr
+	msr	vttbr_el2, xzr			// iamroot - Virtualization Translation Table Base Register, EL2
+								// 이걸 0으로 set
 
 	cbz	x2, install_el2_stub
 
@@ -645,15 +657,29 @@ install_el2_stub:
 	mov	x0, #0x0800			// Set/clear RES{1,0} bits
 CPU_BE(	movk	x0, #0x33d0, lsl #16	)	// Set EE and E0E on BE systems
 CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
+							// iamroot - endianess에 따라 sctlr_el1(System Control Register, EL1)의 EE, EOE를 set 또는 clear   
+							// EE, [25]
+							// Exception endianness. The value of this bit controls the endianness for explicit data accesses at EL1. 
+							// This value also indicates the endianness of the translation table data for translation table lookups. 
+							// The possible values of this bit are:
+							// 0	Little-endian.
+							// 1	Big-endian.
+							// The reset value of this bit is determined by the CFGEND configuration pin.
+
+
+
 	msr	sctlr_el1, x0
 
 	/* Coprocessor traps. */
 	mov	x0, #0x33ff
 	msr	cptr_el2, x0			// Disable copro. traps to EL2
+								// iamroot - EL2로의 trap을 disable한다
 
 	/* Hypervisor stub */
 	adr_l	x0, __hyp_stub_vectors
-	msr	vbar_el2, x0
+	msr	vbar_el2, x0			// iamroot - vbar_el2(Vector Base Address Register, EL2)
+								// 여기에 hyp stub vectors의 주소를 대입 - hyp에서 exception 발생 시, 이걸 통해 jump
+								// 실제로 trap은 발생 안할듯 	
 
 	/* spsr */
 	mov	x0, #(PSR_F_BIT | PSR_I_BIT | PSR_A_BIT | PSR_D_BIT |\
